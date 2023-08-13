@@ -1,28 +1,68 @@
-node {
-    def server
-    def rtMaven = Artifactory.newMavenBuild()
-    def buildInfo
-
-    stage ('Clone') {
-        git url: 'https://github.com/EngAhmedSalah/testAPIs.git'
+pipeline {
+    agent any
+    tools {
+        maven 'maven'
     }
 
-    stage ('Artifactory configuration') {
-        // Obtain an Artifactory server instance, defined in Jenkins --> Manage Jenkins --> Configure System:
-        server = Artifactory.server SERVER_ID
-
-        // Tool name from Jenkins configuration
-        rtMaven.tool = MAVEN_TOOL
-        rtMaven.deployer releaseRepo: ARTIFACTORY_LOCAL_RELEASE_REPO, snapshotRepo: ARTIFACTORY_LOCAL_SNAPSHOT_REPO, server: server
-        rtMaven.resolver releaseRepo: ARTIFACTORY_VIRTUAL_RELEASE_REPO, snapshotRepo: ARTIFACTORY_VIRTUAL_SNAPSHOT_REPO, server: server
-        buildInfo = Artifactory.newBuildInfo()
+    parameters {
+        string(name: "CODE_COVERAGE_QG", defaultValue: '0.5', description: 'Code coverage quality gate')
     }
 
-    stage ('Exec Maven') {
-        rtMaven.run pom: 'pom.xml', goals: 'clean install', buildInfo: buildInfo
-    }
 
-    stage ('Publish build info') {
-        server.publishBuildInfo buildInfo
+    stages {
+    	stage('Pre-Build') {
+    		parallel {
+    			stage('Unit Tests') {
+            		steps{
+                		sh "mvn -f pom.xml clean verify test -Dsuitename=unit_tests.xml -Dcoverage_quality_gate=${params.CODE_COVERAGE_QG}"
+            		}
+            		post {
+        				always {
+            				step( [ $class: 'JacocoPublisher' ] )
+            				step( [ $class: 'JUnitTestReportPublisher', fileIncludePattern: 'maths/target/surefire-reports/junitreports/*.xml' ])
+        				}
+    				}
+        		}
+    		}
+    	}
+
+    	stage ('Upload artifact') {
+    		when {
+                branch 'master'
+            }
+            steps {
+                rtServer (
+                    id: "ARTIFACTORY_SERVER",
+                    url: "http://localhost:8086/artifactory",
+		    credentialsId: 'admin.jfrog'
+                )
+
+                rtMavenDeployer (
+                    id: "MAVEN_DEPLOYER",
+                    serverId: "ARTIFACTORY_SERVER",
+                    releaseRepo: "libs-release-local",
+                    snapshotRepo: "libs-snapshot-local"
+                )
+
+                rtMavenResolver (
+                    id: "MAVEN_RESOLVER",
+                    serverId: "ARTIFACTORY_SERVER",
+                    releaseRepo: "libs-release",
+                    snapshotRepo: "libs-snapshot"
+                )
+
+                rtMavenRun (
+                    tool: "maven", // Tool name from Jenkins configuration
+                    pom: 'pom.xml',
+                    goals: " install -Djacoco.skip=true -Dmaven.test.skip=true -Dcoverage_quality_gate=${params.CODE_COVERAGE_QG}",
+                    deployerId: "MAVEN_DEPLOYER",
+                    resolverId: "MAVEN_RESOLVER"
+                )
+
+                rtPublishBuildInfo (
+                    serverId: "ARTIFACTORY_SERVER"
+                )
+            }
+        }
     }
 }
