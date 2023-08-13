@@ -1,61 +1,183 @@
 pipeline {
     agent any
-    # Global tools to be used by the pipeline
     tools {
-	// Global tools to be used by the pipeline
-        maven 'maven3.6'
-        jdk 'jdk8'
+        maven 'maven'
     }
+
+    parameters {
+        string(name: "CODE_COVERAGE_QG", defaultValue: '0.5', description: 'Code coverage quality gate')
+    }
+
+
     stages {
-	stage('Unit Tests') {
-	    // Run Unit tests
-            steps{
-                sh 'mvn -f maths/pom.xml clean test'
+    	stage('Pre-Build') {
+    		parallel {
+    			stage('Unit Tests') {
+            		steps{
+                		sh "mvn -f maths/pom.xml clean verify test -Dsuitename=unit_tests.xml -Dcoverage_quality_gate=${params.CODE_COVERAGE_QG}"
+            		}
+            		post {
+        				always {
+            				// junit 'maths/target/surefire-reports/junitreports/*.xml'
+            				step( [ $class: 'JacocoPublisher' ] )
+            				step( [ $class: 'JUnitTestReportPublisher', fileIncludePattern: 'maths/target/surefire-reports/junitreports/*.xml' ])
+        				}
+    				}
+        		}
+
+    			stage("Code Quality"){
+        			steps{
+						//withSonarQubeEnv('MySonarQube') {
+                		//	sh '/home/dinesh/ci_cd/sonar-scanner-4.4.0.2170-linux/bin/sonar-scanner -Dproject.settings=maths/sonar-scanner.properties'
+            			//}
+
+            			//timeout(time: 2, unit: 'MINUTES') {
+	                	//	// Parameter indicates whether to set pipeline to UNSTABLE if Quality Gate fails
+	                	//	// true = set pipeline to UNSTABLE, false = don't
+	                	//	waitForQualityGate abortPipeline: true
+            			//}
+            			sh 'echo SONARQUBE'
+        			}
+    			}
+    		}
+    	}
+    	stage('Provision') {
+    		parallel {
+    			stage('DB') {
+    				steps {
+    					sleep 1
+    					sh 'echo USED TO PROVISION DATABASE'
+    				}
+    			}
+    			stage('Wiremock') {
+    				steps {
+    					sh 'echo USED TO PROVISION VIRTUALIZED END POINTS'
+    				}
+    			}
+    			stage('JMeter') {
+    				steps {
+    					sh 'echo USED TO PROVISION JMeter Service'
+    				}
+    			}
+    		}
+
+    	}
+		stage('CI Env.') {
+    		steps {
+    			sleep 1
+    			sh 'echo Application is deployed here in Preview environment'
+    		}
+    	}
+    	stage('Test') {
+    		parallel {
+    			stage('Smoke') {
+    				steps {
+    					sh 'mvn -f maths/ReleaseTests/pom.xml test -Dsuitename=smoke_tests.xml -Dtestng.report.xml.name=smoke-test-results.xml'
+    				}
+    			}
+
+    			stage('Acceptance') {
+    				steps {
+    					sh 'mvn -f maths/ReleaseTests/pom.xml test -Dsuitename=acceptance_tests.xml -Dtestng.report.xml.name=acceptance-test-results.xml'
+    				}
+    			}
+    			stage('Performance') {
+    				steps {
+    					sleep 5
+    					sh 'echo SHIFT LEFT PERF. TESTS'
+    				}
+    			}
+    		}
+    	}
+
+    	stage('Cleanup') {
+    		steps {
+    			sleep 1
+    			sh 'echo CLEAN UP THE PROVISIONED RESOURCES'
+    		}
+    	}
+
+    	stage('Deploy in TRIAL') {
+    		steps {
+    			sleep 1
+    			sh 'echo DEPLOY IN TRIAL/PREPROD ENVIRONMENT'
+    		}
+    	}
+
+    	stage('Test in TRIAL') {
+    		parallel {
+    			stage('Integration') {
+    				steps {
+    					sh 'mvn -f maths/ReleaseTests/pom.xml test -Dsuitename=integration_tests.xml -Dtestng.report.xml.name=integration-test-results.xml'
+    				}
+    			}
+
+    			stage('Performance') {
+    				steps {
+    					sleep 1
+    					sh 'echo PERFORMANCE TESTS'
+    				}
+    			}
+    		}
+    	}
+    	//stage('FUNCTIONAL TEST REPORTS') {
+    	//	steps {
+    	//		script {
+    	//			allure([
+    	//				includeProperties: false,
+   		//				jdk: '',
+   		//				properties: [],
+   		//				reportBuildPolicy: 'ALWAYS',
+   		//				results: [[path: 'maths/target/allure-results']]
+    	//			])
+    	//		}
+    	//	}
+    	//}
+    	stage ('Upload artifact') {
+    		when {
+                branch 'master'
             }
-        }
-        stage ('Artifactory configuration') {
             steps {
-		// specify Artifactory server
                 rtServer (
                     id: "ARTIFACTORY_SERVER",
-                    url: "http://artifactory:8081/artifactory",
+                    url: "http://localhost:8086/artifactory",
 		    credentialsId: 'admin.jfrog'
                 )
-		// specify the repositories to be used for deploying the artifacts in the Artifactory
+
                 rtMavenDeployer (
                     id: "MAVEN_DEPLOYER",
                     serverId: "ARTIFACTORY_SERVER",
                     releaseRepo: "libs-release-local",
                     snapshotRepo: "libs-snapshot-local"
                 )
-		// defines the dependencies resolution details
+
                 rtMavenResolver (
                     id: "MAVEN_RESOLVER",
                     serverId: "ARTIFACTORY_SERVER",
                     releaseRepo: "libs-release",
                     snapshotRepo: "libs-snapshot"
                 )
-            }
-        }
-        stage ('Build & Upload Artifact') {
-	    // run Maven Build and upload the built artifact to Artifactory
-            steps {
+
                 rtMavenRun (
-                    tool: "maven3.6", // Tool name from Jenkins configuration
+                    tool: "maven", // Tool name from Jenkins configuration
                     pom: 'maths/pom.xml',
-                    goals: 'clean install',
+                    goals: " install -Djacoco.skip=true -Dmaven.test.skip=true -Dcoverage_quality_gate=${params.CODE_COVERAGE_QG}",
                     deployerId: "MAVEN_DEPLOYER",
                     resolverId: "MAVEN_RESOLVER"
                 )
-            }
-        }
-        stage ('Publish build info') {
-	    // Publish the build info in the Artifactory
-            steps {
+
                 rtPublishBuildInfo (
                     serverId: "ARTIFACTORY_SERVER"
                 )
             }
         }
+
     }
+    post {
+    	always {
+    		junit 'maths/ReleaseTests/target/surefire-reports/junitreports/*.xml'
+        	// step([$class: 'Publisher', reportFilenamePattern: 'maths/ReleaseTests/target/surefire-reports/testng-results.xml'])
+        	step( [ $class: 'TestNGTestReportPublisher', fileIncludePattern: 'maths/ReleaseTests/target/surefire-reports/*-test-results.xml' ])
+    	}
+	}
 }
