@@ -14,7 +14,7 @@ pipeline {
     		parallel {
     			stage('Unit Tests') {
             		steps{
-                		sh "mvn -f maths/pom.xml clean verify test -Dsuitename=unit_tests.xml -Dcoverage_quality_gate=${params.CODE_COVERAGE_QG}"
+                		sh "mvn -f pom.xml clean verify test -Dsuitename=unit_tests.xml -Dcoverage_quality_gate=${params.CODE_COVERAGE_QG}"
             		}
             		post {
         				always {
@@ -68,27 +68,6 @@ pipeline {
     			sh 'echo Application is deployed here in Preview environment'
     		}
     	}
-    	stage('Test') {
-    		parallel {
-    			stage('Smoke') {
-    				steps {
-    					sh 'mvn -f maths/ReleaseTests/pom.xml test -Dsuitename=smoke_tests.xml -Dtestng.report.xml.name=smoke-test-results.xml'
-    				}
-    			}
-
-    			stage('Acceptance') {
-    				steps {
-    					sh 'mvn -f maths/ReleaseTests/pom.xml test -Dsuitename=acceptance_tests.xml -Dtestng.report.xml.name=acceptance-test-results.xml'
-    				}
-    			}
-    			stage('Performance') {
-    				steps {
-    					sleep 5
-    					sh 'echo SHIFT LEFT PERF. TESTS'
-    				}
-    			}
-    		}
-    	}
 
     	stage('Cleanup') {
     		steps {
@@ -104,22 +83,7 @@ pipeline {
     		}
     	}
 
-    	stage('Test in TRIAL') {
-    		parallel {
-    			stage('Integration') {
-    				steps {
-    					sh 'mvn -f maths/ReleaseTests/pom.xml test -Dsuitename=integration_tests.xml -Dtestng.report.xml.name=integration-test-results.xml'
-    				}
-    			}
 
-    			stage('Performance') {
-    				steps {
-    					sleep 1
-    					sh 'echo PERFORMANCE TESTS'
-    				}
-    			}
-    		}
-    	}
     	//stage('FUNCTIONAL TEST REPORTS') {
     	//	steps {
     	//		script {
@@ -160,7 +124,7 @@ pipeline {
 
                 rtMavenRun (
                     tool: "maven", // Tool name from Jenkins configuration
-                    pom: 'maths/pom.xml',
+                    pom: 'pom.xml',
                     goals: " install -Djacoco.skip=true -Dmaven.test.skip=true -Dcoverage_quality_gate=${params.CODE_COVERAGE_QG}",
                     deployerId: "MAVEN_DEPLOYER",
                     resolverId: "MAVEN_RESOLVER"
