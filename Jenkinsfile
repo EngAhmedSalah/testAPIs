@@ -42,7 +42,7 @@ pipeline {
                     serverId: "ARTIFACTORY_SERVER",
                     releaseRepo: "libs-release-local",
                     snapshotRepo: "libs-snapshot-local"
-                    deployArtifacts = true
+                    deployArtifacts: true
                 )
 
                 rtMavenResolver (
