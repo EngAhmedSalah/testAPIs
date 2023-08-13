@@ -153,7 +153,7 @@
         <repository>
             <id>artifactory</id>
             <name>artifactory</name>
-            <url>http://localhost:8081/artifactory/</url>
+            <url>http://localhost:8082/artifactory/</url>
         </repository>
     </distributionManagement>
 
