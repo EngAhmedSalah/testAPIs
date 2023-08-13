@@ -67,11 +67,4 @@ pipeline {
         }
 
     }
-    post {
-    	always {
-    		junit 'target/surefire-reports/junitreports/*.xml'
-        	// step([$class: 'Publisher', reportFilenamePattern: 'target/surefire-reports/testng-results.xml'])
-        	step( [ $class: 'TestNGTestReportPublisher', fileIncludePattern: 'target/surefire-reports/*-test-results.xml' ])
-    	}
-	}
 }
