@@ -18,12 +18,30 @@ pipeline {
             		}
             		post {
         				always {
-            				// junit 'maths/target/surefire-reports/junitreports/*.xml'
             				step( [ $class: 'JacocoPublisher' ] )
             				step( [ $class: 'JUnitTestReportPublisher', fileIncludePattern: 'maths/target/surefire-reports/junitreports/*.xml' ])
         				}
     				}
         		}
+    		}
+    	}
+    	
+    	stage('Test') {
+    		parallel {
+    			stage('Smoke') {
+    				steps {
+    					sh 'mvn -f pom.xml test -Dsuitename=smoke_tests.xml -Dtestng.report.xml.name=smoke-test-results.xml'
+    				}
+    			}
+
+    			stage('Acceptance') {
+    				steps {
+    					sh 'mvn -f pom.xml test -Dsuitename=acceptance_tests.xml -Dtestng.report.xml.name=acceptance-test-results.xml'
+    				}
+    			}
+    		}
+    	}
+
 
     	stage ('Upload artifact') {
     		when {
