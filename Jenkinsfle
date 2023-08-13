@@ -1,7 +1,7 @@
 pipeline {
     agent any
     tools {
-        maven 'maven 3.9.4'
+        maven 'maven'
     }
 
     parameters {
@@ -25,78 +25,6 @@ pipeline {
     				}
         		}
 
-    			stage("Code Quality"){
-        			steps{
-						//withSonarQubeEnv('MySonarQube') {
-                		//	sh '/home/dinesh/ci_cd/sonar-scanner-4.4.0.2170-linux/bin/sonar-scanner -Dproject.settings=maths/sonar-scanner.properties'
-            			//}
-
-            			//timeout(time: 2, unit: 'MINUTES') {
-	                	//	// Parameter indicates whether to set pipeline to UNSTABLE if Quality Gate fails
-	                	//	// true = set pipeline to UNSTABLE, false = don't
-	                	//	waitForQualityGate abortPipeline: true
-            			//}
-            			sh 'echo SONARQUBE'
-        			}
-    			}
-    		}
-    	}
-    	stage('Provision') {
-    		parallel {
-    			stage('DB') {
-    				steps {
-    					sleep 1
-    					sh 'echo USED TO PROVISION DATABASE'
-    				}
-    			}
-    			stage('Wiremock') {
-    				steps {
-    					sh 'echo USED TO PROVISION VIRTUALIZED END POINTS'
-    				}
-    			}
-    			stage('JMeter') {
-    				steps {
-    					sh 'echo USED TO PROVISION JMeter Service'
-    				}
-    			}
-    		}
-
-    	}
-		stage('CI Env.') {
-    		steps {
-    			sleep 1
-    			sh 'echo Application is deployed here in Preview environment'
-    		}
-    	}
-
-    	stage('Cleanup') {
-    		steps {
-    			sleep 1
-    			sh 'echo CLEAN UP THE PROVISIONED RESOURCES'
-    		}
-    	}
-
-    	stage('Deploy in TRIAL') {
-    		steps {
-    			sleep 1
-    			sh 'echo DEPLOY IN TRIAL/PREPROD ENVIRONMENT'
-    		}
-    	}
-
-
-    	//stage('FUNCTIONAL TEST REPORTS') {
-    	//	steps {
-    	//		script {
-    	//			allure([
-    	//				includeProperties: false,
-   		//				jdk: '',
-   		//				properties: [],
-   		//				reportBuildPolicy: 'ALWAYS',
-   		//				results: [[path: 'maths/target/allure-results']]
-    	//			])
-    	//		}
-    	//	}
-    	//}
     	stage ('Upload artifact') {
     		when {
                 branch 'master'
@@ -137,5 +65,11 @@ pipeline {
         }
 
     }
-
+    post {
+    	always {
+    		junit 'target/surefire-reports/junitreports/*.xml'
+        	// step([$class: 'Publisher', reportFilenamePattern: 'target/surefire-reports/testng-results.xml'])
+        	step( [ $class: 'TestNGTestReportPublisher', fileIncludePattern: 'target/surefire-reports/*-test-results.xml' ])
+    	}
+	}
 }
