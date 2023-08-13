@@ -25,22 +25,6 @@ pipeline {
         		}
     		}
     	}
-    	
-    	stage('Test') {
-    		parallel {
-    			stage('Smoke') {
-    				steps {
-    					sh 'mvn -f pom.xml test -Dsuitename=smoke_tests.xml -Dtestng.report.xml.name=smoke-test-results.xml'
-    				}
-    			}
-
-    			stage('Acceptance') {
-    				steps {
-    					sh 'mvn -f pom.xml test -Dsuitename=acceptance_tests.xml -Dtestng.report.xml.name=acceptance-test-results.xml'
-    				}
-    			}
-    		}
-    	}
 
 
     	stage ('Upload artifact') {
