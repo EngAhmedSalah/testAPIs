@@ -19,7 +19,7 @@ pipeline {
             		post {
         				always {
             				step( [ $class: 'JacocoPublisher' ] )
-            				step( [ $class: 'JUnitTestReportPublisher', fileIncludePattern: 'maths/target/surefire-reports/junitreports/*.xml' ])
+            				step( [ $class: 'JUnitTestReportPublisher', fileIncludePattern: 'target/surefire-reports/junitreports/*.xml' ])
         				}
     				}
         		}
@@ -33,8 +33,8 @@ pipeline {
             steps {
                 rtServer (
                     id: "ARTIFACTORY_SERVER",
-                    url: "http://localhost:8086/artifactory",
-		    credentialsId: 'admin.jfrog'
+                    url: "http://localhost:8080/artifactory",
+		    credentialsId: 'ahmed.Admin@123'
                 )
 
                 rtMavenDeployer (
